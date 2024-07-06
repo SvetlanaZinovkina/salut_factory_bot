@@ -1,0 +1,1 @@
+# salut_factory_bot
