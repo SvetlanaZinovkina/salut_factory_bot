@@ -22,58 +22,70 @@ bot.api.setMyCommands([
 		{ command: 'clear', description: 'Очистить чат' }
 ]);
 
-bot.command('start', (ctx) => {
-		ctx.session.awaitingSecret = true;
-		ctx.reply("Введите секретное слово для доступа к боту:");
+bot.command('start', async (ctx) => {
+		try {
+				ctx.session.awaitingSecret = true;
+				await ctx.reply("Введите секретное слово для доступа к боту:");
+		} catch (error) {
+				console.error('Error in /start command:', error);
+				await ctx.reply("Произошла ошибка при обработке команды /start.");
+		}
 });
 
 bot.command('clear', async (ctx) => {
-		const chatId = ctx.chat.id;
-		const users = await getUsers();
-		// Проверяем, что пользователь существует в базе данных
-		const userExists = users.includes(chatId);
-		if (!userExists) {
-				return ctx.reply("У вас нет доступа к этой команде.");
-		}
+		try {
+				const chatId = ctx.chat.id;
+				const users = await getUsers();
 
-		// Удаляем сообщения (для Telegram бота это означает отправку пустого сообщения с reply_markup для удаления кнопок)
-		const deleteMessages = async (chatId, messageId) => {
-				await ctx.api.deleteMessage(chatId, messageId);
-		};
-
-		// Прокручиваем последние сообщения и удаляем их
-		for (let i = 0; i < 100; i++) {
-				try {
-						await deleteMessages(chatId, ctx.message.message_id - i);
-				} catch (e) {
-						// Если не удается удалить сообщение (возможно, сообщение старое или уже удалено), продолжаем
-						continue;
+				const userExists = users.includes(chatId);
+				if (!userExists) {
+						return await ctx.reply("У вас нет доступа к этой команде.");
 				}
-		}
 
-		await ctx.reply("Чат очищен.");
+				for (let i = 0; i < 100; i++) {
+						try {
+								await ctx.api.deleteMessage(chatId, ctx.message.message_id - i);
+						} catch (e) {
+								continue;
+						}
+				}
+
+				await ctx.reply("Чат очищен.");
+		} catch (error) {
+				console.error('Error in /clear command:', error);
+				await ctx.reply("Произошла ошибка при очистке чата.");
+		}
 });
 
 bot.on('message', async (ctx) => {
-		const chatId = ctx.chat.id;
+		try {
+				const chatId = ctx.chat.id;
 
-		if (ctx.session.awaitingSecret) {
-				ctx.session.awaitingSecret = false;
-				if (ctx.message.text === inviteToken) {
-						await addUser(chatId);
-						await ctx.reply("Добро пожаловать! Теперь вы будете получать все сообщения.");
-				} else {
-						await ctx.reply("Неверное секретное слово. Доступ к боту запрещен.");
+				if (ctx.session.awaitingSecret) {
+						ctx.session.awaitingSecret = false;
+						if (ctx.message.text === inviteToken) {
+								await addUser(chatId);
+								await ctx.reply("Добро пожаловать! Теперь вы будете получать все сообщения.");
+						} else {
+								await ctx.reply("Неверное секретное слово. Доступ к боту запрещен.");
+						}
+						return;
 				}
-				return;
-		}
 
-		const users = await getUsers();
-		for (const user of users) {
-				if (user !== chatId) {
-						await bot.api.sendMessage(user, ctx.message.text);
+				const users = await getUsers();
+				for (const user of users) {
+						if (user !== chatId) {
+								await bot.api.sendMessage(user, ctx.message.text);
+						}
 				}
+		} catch (error) {
+				console.error('Error in message handler:', error);
 		}
 });
+
+bot.catch((error) => {
+		console.error('Error in bot:', error);
+});
+
 
 bot.start();
