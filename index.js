@@ -24,8 +24,16 @@ bot.api.setMyCommands([
 
 bot.command('start', async (ctx) => {
 		try {
-				ctx.session.awaitingSecret = true;
-				await ctx.reply("Введите секретное слово для доступа к боту:");
+				const chatId = ctx.chat.id;
+				const users = await getUsers();
+
+				const userExists = users.includes(chatId);
+				if (userExists) {
+						await ctx.reply("Добро пожаловать обратно!");
+				} else {
+						ctx.session.awaitingSecret = true;
+						await ctx.reply("Введите секретное слово для доступа к боту:");
+				}
 		} catch (error) {
 				console.error('Error in /start command:', error);
 				await ctx.reply("Произошла ошибка при обработке команды /start.");
@@ -61,22 +69,22 @@ bot.on('message', async (ctx) => {
 		try {
 				const chatId = ctx.chat.id;
 
-				if (ctx.session.awaitingSecret) {
-						ctx.session.awaitingSecret = false;
+				if (!ctx.session.awaitingSecret) {
+						const users = await getUsers();
+						for (const user of users) {
+								if (user !== chatId) {
+										await bot.api.sendMessage(user, ctx.message.text);
+								}
+						}
+				} else {
 						if (ctx.message.text === inviteToken) {
 								await addUser(chatId);
 								await ctx.reply("Добро пожаловать! Теперь вы будете получать все сообщения.");
 						} else {
 								await ctx.reply("Неверное секретное слово. Доступ к боту запрещен.");
 						}
-						return;
-				}
 
-				const users = await getUsers();
-				for (const user of users) {
-						if (user !== chatId) {
-								await bot.api.sendMessage(user, ctx.message.text);
-						}
+						ctx.session.awaitingSecret = false;
 				}
 		} catch (error) {
 				console.error('Error in message handler:', error);
